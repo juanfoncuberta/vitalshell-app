@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Send, Headset } from "lucide-react"
+import { Send } from "lucide-react"
 import { ScreenHeader } from "@/components/vitalshell/primitives"
 import { quickChips, type ChatMessage } from "@/lib/vitalshell-data"
 import { PROXY } from "@/lib/api"
@@ -143,25 +143,6 @@ export function AssistantScreen() {
         </button>
       </form>
 
-      <div className="mt-4 shrink-0">
-        <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-fg-subtle">
-          <span className="h-px flex-1 bg-edge" />
-          Soporte técnico
-          <span className="h-px flex-1 bg-edge" />
-        </div>
-        <div className="mt-3 flex items-center gap-3 rounded-xl border border-edge bg-card p-3.5">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-lg"
-            style={{ backgroundColor: "rgba(0,128,128,0.18)", color: "var(--color-secondary)" }}
-          >
-            <Headset size={20} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-fg">Habla con un especialista</p>
-            <p className="text-xs text-fg-muted">Respuesta media menor a 5 min · Lun–Sáb</p>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

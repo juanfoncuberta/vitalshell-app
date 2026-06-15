@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Droplets, Zap } from "lucide-react"
 import { Card, ProgressBar, SectionLabel, StatCard } from "@/components/vitalshell/primitives"
 import { HeaderAvatar } from "@/components/vitalshell/avatar"
@@ -67,7 +68,20 @@ function PlansCard({ rules }: { rules: Rule[] }) {
   )
 }
 
+function useLiveClock() {
+  const [time, setTime] = useState("")
+  useEffect(() => {
+    const tick = () =>
+      setTime(new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return time
+}
+
 export function HomeScreen() {
+  const time = useLiveClock()
   const { data, rules } = useVitalShell()
   const metrics = data?.calculated_metrics
   const sensors = data?.sensors
@@ -88,7 +102,7 @@ export function HomeScreen() {
       <header className="flex items-start justify-between gap-3 px-1">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-fg">VitalShell</h1>
-          <p className="mt-0.5 text-sm text-fg-muted">Barcelona · Ahora</p>
+          <p className="mt-0.5 text-sm text-fg-muted">Barcelona · {time}</p>
         </div>
         <HeaderAvatar />
       </header>

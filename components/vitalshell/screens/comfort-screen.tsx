@@ -40,24 +40,27 @@ function Slider({
         aria-label={label}
       />
       <div className="flex justify-between text-[10px] text-fg-subtle">
-        <span>
-          {min}
-          {unit}
-        </span>
-        <span>
-          {max}
-          {unit}
-        </span>
+        <span>{min}{unit}</span>
+        <span>{max}{unit}</span>
       </div>
     </div>
   )
 }
 
 type StatStatus = "ok" | "warning" | "danger" | "neutral"
-
 function apiStatus(s?: string | null): StatStatus {
   if (s === "ok" || s === "warning" || s === "danger") return s
   return "neutral"
+}
+
+// API returns { temperature_min, temperature_max, humidity_min, humidity_max }
+interface ComfortPrefs {
+  temperature_min?: number
+  temperature_max?: number
+  humidity_min?: number
+  humidity_max?: number
+  target_temperature?: number
+  target_humidity?: number
 }
 
 export function ComfortScreen() {
@@ -81,40 +84,42 @@ export function ComfortScreen() {
   useEffect(() => {
     if (prefLoaded.current) return
     prefLoaded.current = true
-    fetch(`${PROXY}/comfort`, { headers: { "X-API-Key": API_KEY } })
+    fetch(`${PROXY}/comfort`)
       .then((r) => r.json())
-      .then((json: { target_temperature?: number; target_humidity?: number }) => {
-        if (json?.target_temperature != null) setTemp(Math.round(json.target_temperature))
-        if (json?.target_humidity != null) setHumidity(Math.round(json.target_humidity))
+      .then((json: ComfortPrefs) => {
+        // Handle both field name formats
+        const t = json?.target_temperature ?? json?.temperature_max ?? json?.temperature_min
+        const h = json?.target_humidity ?? json?.humidity_max ?? json?.humidity_min
+        if (t != null) setTemp(Math.round(t))
+        if (h != null) setHumidity(Math.round(h))
       })
       .catch(() => {})
   }, [])
 
-  // Fetch sensor history for the chart
+  // Fetch sensor history — API only accepts 1h, 24h, 7d
   useEffect(() => {
-    fetch(`${PROXY}/sensors/history?period=12h`, { headers: { "X-API-Key": API_KEY } })
+    fetch(`${PROXY}/sensors/history?period=24h`)
       .then((r) => r.json())
       .then((json: unknown) => {
-        const arr = Array.isArray(json)
+        const raw = Array.isArray(json)
           ? json
           : Array.isArray((json as Record<string, unknown>)?.data)
-            ? (json as Record<string, unknown>).data as unknown[]
+            ? ((json as Record<string, unknown>).data as unknown[])
             : null
-        if (!arr) return
+        if (!raw) return
 
-        const pts: TempPoint[] = arr.map((p: unknown, i: number) => {
+        const pts: TempPoint[] = raw.map((p: unknown, i: number) => {
           const point = p as Record<string, unknown>
           const interior =
             (point.temperature as number | null) ??
-            ((point.sensors as Record<string, unknown>)?.temperature as Record<string, unknown>)?.value as number | null ??
+            ((point.sensors as Record<string, unknown>)?.temperature as Record<string, unknown>)
+              ?.value as number | null ??
             null
           const exterior =
             (point.ext_temperature as number | null) ??
             (point.exterior_temperature as number | null) ??
             null
-          const isFirst = i === 0
-          const isLast = i === arr.length - 1
-          const label = isFirst ? "-12h" : isLast ? "Ahora" : ""
+          const label = i === 0 ? "-24h" : i === raw.length - 1 ? "Ahora" : ""
           return { label, interior, exterior }
         })
         setSeries(pts)
@@ -122,26 +127,24 @@ export function ComfortScreen() {
       .catch(() => {})
   }, [])
 
-  // Debounced save of comfort preferences
   const savePrefs = useCallback((t: number, h: number) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       fetch(`${PROXY}/comfort`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_temperature: t, target_humidity: h }),
+        body: JSON.stringify({
+          temperature_min: t - 2,
+          temperature_max: t,
+          humidity_min: h - 10,
+          humidity_max: h,
+        }),
       }).catch(() => {})
     }, 600)
   }, [])
 
-  function handleTemp(v: number) {
-    setTemp(v)
-    savePrefs(v, humidity)
-  }
-  function handleHum(v: number) {
-    setHumidity(v)
-    savePrefs(temp, v)
-  }
+  function handleTemp(v: number) { setTemp(v); savePrefs(v, humidity) }
+  function handleHum(v: number) { setHumidity(v); savePrefs(temp, v) }
 
   return (
     <div className="space-y-5">
@@ -170,7 +173,7 @@ export function ComfortScreen() {
       )}
 
       <Card>
-        <SectionLabel>Temperatura · últimas 12h</SectionLabel>
+        <SectionLabel>Temperatura · últimas 24h</SectionLabel>
         <TempLineChart series={series} />
       </Card>
 
