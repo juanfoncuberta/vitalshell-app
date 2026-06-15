@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Card, InfoBanner, ScreenHeader, SectionLabel, StatCard } from "@/components/vitalshell/primitives"
 import { TempLineChart, type TempPoint } from "@/components/vitalshell/charts"
 import { useVitalShell } from "@/lib/vitalshell-context"
-import { API_KEY, API_URL, fmt } from "@/lib/api"
+import { fmt, PROXY } from "@/lib/api"
 
 function Slider({
   label,
@@ -81,7 +81,7 @@ export function ComfortScreen() {
   useEffect(() => {
     if (prefLoaded.current) return
     prefLoaded.current = true
-    fetch(`${API_URL}/api/comfort`, { headers: { "X-API-Key": API_KEY } })
+    fetch(`${PROXY}/comfort`, { headers: { "X-API-Key": API_KEY } })
       .then((r) => r.json())
       .then((json: { target_temperature?: number; target_humidity?: number }) => {
         if (json?.target_temperature != null) setTemp(Math.round(json.target_temperature))
@@ -92,7 +92,7 @@ export function ComfortScreen() {
 
   // Fetch sensor history for the chart
   useEffect(() => {
-    fetch(`${API_URL}/api/sensors/history?period=12h`, { headers: { "X-API-Key": API_KEY } })
+    fetch(`${PROXY}/sensors/history?period=12h`, { headers: { "X-API-Key": API_KEY } })
       .then((r) => r.json())
       .then((json: unknown) => {
         const arr = Array.isArray(json)
@@ -126,9 +126,9 @@ export function ComfortScreen() {
   const savePrefs = useCallback((t: number, h: number) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      fetch(`${API_URL}/api/comfort`, {
+      fetch(`${PROXY}/comfort`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target_temperature: t, target_humidity: h }),
       }).catch(() => {})
     }, 600)

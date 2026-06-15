@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { API_KEY, API_URL, WS_URL } from "./api"
+import { API_KEY, PROXY, WS_URL } from "./api"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -162,9 +162,7 @@ export function VitalShellProvider({ children }: { children: ReactNode }) {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/data`, {
-        headers: { "X-API-Key": API_KEY },
-      })
+      const res = await fetch(`${PROXY}/data`)
       if (res.ok && mounted.current) {
         const json = (await res.json()) as ApiData
         setData(json)
@@ -178,9 +176,7 @@ export function VitalShellProvider({ children }: { children: ReactNode }) {
 
   const fetchRules = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/rules?limit=20`, {
-        headers: { "X-API-Key": API_KEY },
-      })
+      const res = await fetch(`${PROXY}/rules?limit=20`)
       if (res.ok && mounted.current) {
         const json = (await res.json()) as Rule[] | { data?: Rule[]; rules?: Rule[] }
         setRules(Array.isArray(json) ? json : (json?.data ?? json?.rules ?? []))

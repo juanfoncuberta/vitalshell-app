@@ -2,6 +2,9 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL!
 export const API_KEY = process.env.NEXT_PUBLIC_API_KEY!
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL!
 
+// All HTTP calls go through this proxy so HTTPS pages can reach the HTTP backend
+export const PROXY = "/api/proxy"
+
 export function fmt(v: number | null | undefined, decimals?: number): string {
   if (v == null || (typeof v === "number" && isNaN(v))) return "--"
   return decimals != null ? v.toFixed(decimals) : String(v)

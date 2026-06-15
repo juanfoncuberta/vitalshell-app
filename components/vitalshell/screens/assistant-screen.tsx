@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { Send, Headset } from "lucide-react"
 import { ScreenHeader } from "@/components/vitalshell/primitives"
 import { quickChips, type ChatMessage } from "@/lib/vitalshell-data"
-import { API_KEY, API_URL } from "@/lib/api"
+import { PROXY } from "@/lib/api"
 
 const WELCOME: ChatMessage = {
   id: 0,
@@ -46,9 +46,9 @@ export function AssistantScreen() {
     setTyping(true)
 
     try {
-      const res = await fetch(`${API_URL}/api/chat`, {
+      const res = await fetch(`${PROXY}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed }),
       })
       const json = (await res.json()) as Record<string, unknown>
