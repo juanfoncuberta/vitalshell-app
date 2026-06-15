@@ -1,0 +1,186 @@
+"use client"
+
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Card, InfoBanner, ScreenHeader, SectionLabel, StatCard } from "@/components/vitalshell/primitives"
+import { TempLineChart, type TempPoint } from "@/components/vitalshell/charts"
+import { useVitalShell } from "@/lib/vitalshell-context"
+import { API_KEY, API_URL, fmt } from "@/lib/api"
+
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  unit,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  unit: string
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-fg-muted">{label}</span>
+        <span className="font-semibold text-fg">
+          {value}
+          {unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        className="vs-slider w-full"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label}
+      />
+      <div className="flex justify-between text-[10px] text-fg-subtle">
+        <span>
+          {min}
+          {unit}
+        </span>
+        <span>
+          {max}
+          {unit}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+type StatStatus = "ok" | "warning" | "danger" | "neutral"
+
+function apiStatus(s?: string | null): StatStatus {
+  if (s === "ok" || s === "warning" || s === "danger") return s
+  return "neutral"
+}
+
+export function ComfortScreen() {
+  const { data } = useVitalShell()
+  const sensors = data?.sensors
+  const envCtx = data?.environmental_context
+
+  const interiorTemp = sensors?.temperature?.value ?? null
+  const interiorTempStatus = apiStatus(sensors?.temperature?.status)
+  const interiorHum = sensors?.humidity?.value ?? null
+  const interiorHumStatus = apiStatus(sensors?.humidity?.status)
+  const extTemp = envCtx?.current?.ext_temperature?.value ?? null
+
+  const [temp, setTemp] = useState(22)
+  const [humidity, setHumidity] = useState(50)
+  const [series, setSeries] = useState<TempPoint[]>([])
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prefLoaded = useRef(false)
+
+  // Load comfort preferences once
+  useEffect(() => {
+    if (prefLoaded.current) return
+    prefLoaded.current = true
+    fetch(`${API_URL}/api/comfort`, { headers: { "X-API-Key": API_KEY } })
+      .then((r) => r.json())
+      .then((json: { target_temperature?: number; target_humidity?: number }) => {
+        if (json?.target_temperature != null) setTemp(Math.round(json.target_temperature))
+        if (json?.target_humidity != null) setHumidity(Math.round(json.target_humidity))
+      })
+      .catch(() => {})
+  }, [])
+
+  // Fetch sensor history for the chart
+  useEffect(() => {
+    fetch(`${API_URL}/api/sensors/history?period=12h`, { headers: { "X-API-Key": API_KEY } })
+      .then((r) => r.json())
+      .then((json: unknown) => {
+        const arr = Array.isArray(json)
+          ? json
+          : Array.isArray((json as Record<string, unknown>)?.data)
+            ? (json as Record<string, unknown>).data as unknown[]
+            : null
+        if (!arr) return
+
+        const pts: TempPoint[] = arr.map((p: unknown, i: number) => {
+          const point = p as Record<string, unknown>
+          const interior =
+            (point.temperature as number | null) ??
+            ((point.sensors as Record<string, unknown>)?.temperature as Record<string, unknown>)?.value as number | null ??
+            null
+          const exterior =
+            (point.ext_temperature as number | null) ??
+            (point.exterior_temperature as number | null) ??
+            null
+          const isFirst = i === 0
+          const isLast = i === arr.length - 1
+          const label = isFirst ? "-12h" : isLast ? "Ahora" : ""
+          return { label, interior, exterior }
+        })
+        setSeries(pts)
+      })
+      .catch(() => {})
+  }, [])
+
+  // Debounced save of comfort preferences
+  const savePrefs = useCallback((t: number, h: number) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      fetch(`${API_URL}/api/comfort`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+        body: JSON.stringify({ target_temperature: t, target_humidity: h }),
+      }).catch(() => {})
+    }, 600)
+  }, [])
+
+  function handleTemp(v: number) {
+    setTemp(v)
+    savePrefs(v, humidity)
+  }
+  function handleHum(v: number) {
+    setHumidity(v)
+    savePrefs(temp, v)
+  }
+
+  return (
+    <div className="space-y-5">
+      <ScreenHeader title="Comfort" subtitle="Condiciones interiores · En vivo" />
+
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          label="Temperatura interior"
+          value={interiorTemp != null ? fmt(interiorTemp, 1) : "--"}
+          unit="°C"
+          status={interiorTempStatus}
+        />
+        <StatCard
+          label="Humedad interior"
+          value={interiorHum != null ? fmt(interiorHum, 0) : "--"}
+          unit="%"
+          status={interiorHumStatus}
+        />
+      </div>
+
+      {extTemp != null && (
+        <Card className="flex items-center justify-between">
+          <span className="text-sm text-fg-muted">Temperatura exterior</span>
+          <span className="text-sm font-semibold text-fg">{fmt(extTemp, 1)} °C</span>
+        </Card>
+      )}
+
+      <Card>
+        <SectionLabel>Temperatura · últimas 12h</SectionLabel>
+        <TempLineChart series={series} />
+      </Card>
+
+      <Card className="space-y-5">
+        <SectionLabel>Tu preferencia</SectionLabel>
+        <Slider label="Temperatura" value={temp} min={18} max={30} unit="°C" onChange={handleTemp} />
+        <Slider label="Humedad" value={humidity} min={30} max={70} unit="%" onChange={handleHum} />
+      </Card>
+
+      <InfoBanner>VitalShell ajustará el edificio para alcanzar tu comfort de forma sostenible.</InfoBanner>
+    </div>
+  )
+}
